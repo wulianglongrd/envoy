@@ -1,0 +1,74 @@
+# Build:
+#   docker build -t wuliang/envoy-dev:0.1 -f Dockerfile-wuliang .
+#
+# Run:
+#   docker run -d \
+#       --privileged \
+#       -p 127.0.0.1:2222:22 \
+#       --name wuliang-envoy-dev \
+#       --mount type=bind,source="$PWD",target="/home/user/envoy" \
+#       wuliang/envoy-dev:0.1
+#
+# OR: docker run -d --privileged -p 127.0.0.1:2222:22 --name wuliang-envoy-dev --mount type=bind,source="$PWD",target="/home/user/envoy" wuliang/envoy-dev:0.1
+#
+# Clear credentials:
+#   ssh-keygen -f "$HOME/.ssh/known_hosts" -R "[localhost]:2222"
+#
+# stop:
+#   docker stop wuliang-envoy-dev
+#
+# ssh credentials (test user):
+#   ssh user@localhost -p2222 (enter `password` on the command-line)
+
+# generate image run `sh image.sh`
+FROM envoyproxy/envoy-build-ubuntu:f94a38f62220a2b017878b790b6ea98a0f6c5f9c@sha256:2dd96b6f43c08ccabd5f4747fce5854f5f96af509b32e5cf6493f136e9833649
+
+# - git (and git-lfs), for git operations (to e.g. push your work).
+#   Also required for setting up your configured dotfiles in the workspace.
+# - sudo, while not required, is recommended to be installed, since the
+#   workspace user (`gitpod`) is non-root and won't be able to install
+#   and use `sudo` to install any other tools in a live workspace.
+RUN apt-get update && apt-get install --no-install-recommends -yq \
+    net-tools \
+    iproute2 \
+    iptables \
+    cmake \
+    ninja-build \
+    git \
+    sudo \
+    ssh \
+    lldb \
+    && apt-get clean && rm -rf /var/lib/apt/lists/* /tmp/*
+
+# Create the configuration file for sshd
+RUN ( \
+    echo 'LogLevel DEBUG2'; \
+    echo 'PermitRootLogin yes'; \
+    echo 'PasswordAuthentication yes'; \
+    echo 'AllowTcpForwarding yes'; \
+    echo 'Subsystem sftp /usr/lib/openssh/sftp-server'; \
+  ) > /etc/ssh/sshd_remote_dev \
+  && mkdir /run/sshd
+
+# Add remote user with a plaintext password.
+ARG REMOTE_USER=user
+ARG REMOTE_USER_PASSWORD=password
+ARG REMOTE_USER_HOME=/home/$REMOTE_USER
+ARG REMOTE_USER_SHELL=/bin/bash
+ARG REMOTE_USER_LOGIN_SCRIPT=$REMOTE_USER_HOME/.bashrc
+ARG REMOTE_USER_ID=3333
+ARG REMOTE_USER_GROUPS=sudo
+
+# ignoring because the current shell doesn't support pipefail; likely want to have a better fix long term
+# hadolint ignore=DL4006
+RUN useradd -lm \
+  -u $REMOTE_USER_ID \
+  -G $REMOTE_USER_GROUPS \
+  -d $REMOTE_USER_HOME \
+  -s $REMOTE_USER_SHELL \
+  $REMOTE_USER \
+  && yes $REMOTE_USER_PASSWORD | passwd $REMOTE_USER
+
+ENV BUILD_WITH_CONTAINER=0
+EXPOSE 22
+CMD ["/usr/sbin/sshd", "-D", "-e", "-f", "/etc/ssh/sshd_remote_dev"]
