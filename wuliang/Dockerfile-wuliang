@@ -5,11 +5,12 @@
 #   docker run -d \
 #       --privileged \
 #       -p 127.0.0.1:2222:22 \
+#       -p 127.0.0.1:1234:1234 \
 #       --name wuliang-envoy-dev \
 #       --mount type=bind,source="$PWD",target="/home/user/envoy" \
 #       wuliang/envoy-dev:0.1
 #
-# OR: docker run -d --privileged -p 127.0.0.1:2222:22 --name wuliang-envoy-dev --mount type=bind,source="$PWD",target="/home/user/envoy" wuliang/envoy-dev:0.1
+# OR: docker run -d --privileged -p 127.0.0.1:2222:22 -p 127.0.0.1:1234:1234 --name wuliang-envoy-dev --mount type=bind,source="$PWD",target="/home/user/envoy" wuliang/envoy-dev:0.1
 #
 # Clear credentials:
 #   ssh-keygen -f "$HOME/.ssh/known_hosts" -R "[localhost]:2222"
@@ -38,6 +39,7 @@ RUN apt-get update && apt-get install --no-install-recommends -yq \
     sudo \
     ssh \
     lldb \
+    gdbserver \
     && apt-get clean && rm -rf /var/lib/apt/lists/* /tmp/*
 
 # Create the configuration file for sshd
@@ -70,5 +72,5 @@ RUN useradd -lm \
   && yes $REMOTE_USER_PASSWORD | passwd $REMOTE_USER
 
 ENV BUILD_WITH_CONTAINER=0
-EXPOSE 22
+EXPOSE 22 1234
 CMD ["/usr/sbin/sshd", "-D", "-e", "-f", "/etc/ssh/sshd_remote_dev"]
